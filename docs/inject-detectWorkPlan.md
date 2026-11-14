@@ -55,10 +55,10 @@
 > 목표: 이후 모든 작업이 올라갈 패키지 골격과 자동 테스트 환경 확보
 
 ### S1-1. 레포 및 패키지 구조
-- [ ] 계획서 7장의 디렉터리 구조 생성 (`promptshield/`, `server/`, `training/`, `data/`, `eval/`, `examples/`, `tests/`)
-- [ ] `pyproject.toml` 작성 (패키지명 `promptshield-ko`, Python 3.10+)
-- [ ] 의존성 그룹 분리: 기본(런타임 최소), `[ml]`(onnxruntime, tokenizers), `[server]`(fastapi), `[train]`, `[dev]`
-- [ ] `.gitignore`에 `data/raw/`, `data/processed/`, 모델 가중치 경로 추가
+- [x] 계획서 7장의 디렉터리 구조 생성 (`promptshield/`, `server/`, `training/`, `data/`, `eval/`, `examples/`, `tests/`)
+- [x] `pyproject.toml` 작성 (패키지명 `promptshield-ko`, Python 3.10+)
+- [x] 의존성 그룹 분리: 기본(런타임 최소), `[ml]`(onnxruntime, tokenizers), `[server]`(fastapi), `[train]`, `[dev]`
+- [x] `.gitignore`에 `data/raw/`, `data/processed/`, 모델 가중치 경로 추가
 - **산출물**: 설치 가능한 빈 패키지 (`pip install -e .` 성공)
 
 ### S1-2. 개발 도구
