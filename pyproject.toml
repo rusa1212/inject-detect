@@ -59,3 +59,18 @@ packages = ["promptshield"]
 
 [tool.hatch.build.targets.sdist]
 include = ["promptshield", "README.md", "pyproject.toml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: import 정렬, UP: pyupgrade, B: bugbear, SIM: 단순화
+select = ["E", "W", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["promptshield"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
