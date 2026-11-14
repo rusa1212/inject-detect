@@ -1,0 +1,61 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "promptshield-ko"
+version = "0.0.1"
+description = "Korean/English prompt injection detection layer for LLM apps"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["llm", "security", "prompt-injection", "korean", "guardrail"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Natural Language :: Korean",
+    "Topic :: Security",
+]
+# 런타임 최소 의존성: 정규화 + 룰 엔진(YAML 룰셋)만으로 동작
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# ML 분류기 추론 (ONNX Runtime, CPU)
+ml = [
+    "onnxruntime>=1.17",
+    "tokenizers>=0.15",
+    "huggingface-hub>=0.20",
+]
+# FastAPI 미들웨어 / 프록시 서버
+server = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "httpx>=0.27",
+]
+# 모델 학습·변환 (Colab 등 학습 환경용)
+train = [
+    "transformers>=4.40",
+    "datasets>=2.18",
+    "torch>=2.2",
+    "accelerate>=0.28",
+    "scikit-learn>=1.4",
+    "onnx>=1.16",
+    "optimum>=1.19",
+]
+# 개발 도구
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "pre-commit>=3.6",
+    "httpx>=0.27",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["promptshield"]
+
+[tool.hatch.build.targets.sdist]
+include = ["promptshield", "README.md", "pyproject.toml"]
