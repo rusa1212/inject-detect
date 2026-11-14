@@ -62,8 +62,8 @@
 - **산출물**: 설치 가능한 빈 패키지 (`pip install -e .` 성공)
 
 ### S1-2. 개발 도구
-- [ ] ruff(린트·포맷), pytest, pre-commit 설정
-- [ ] `tests/test_smoke.py`로 import 확인 테스트 1건
+- [x] ruff(린트·포맷), pytest, pre-commit 설정
+- [x] `tests/test_smoke.py`로 import 확인 테스트 1건
 - **산출물**: 로컬에서 `pre-commit run --all-files`, `pytest` 통과
 
 ### S1-3. CI
