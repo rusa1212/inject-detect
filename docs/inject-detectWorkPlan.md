@@ -67,8 +67,8 @@
 - **산출물**: 로컬에서 `pre-commit run --all-files`, `pytest` 통과
 
 ### S1-3. CI
-- [ ] GitHub Actions 워크플로: Python 3.10/3.11/3.12 매트릭스로 lint + pytest
-- [ ] README에 CI 배지 추가
+- [x] GitHub Actions 워크플로: Python 3.10/3.11/3.12 매트릭스로 lint + pytest
+- [x] README에 CI 배지 추가
 - **완료 기준**: main 브랜치 push 시 CI 녹색
 
 ---
