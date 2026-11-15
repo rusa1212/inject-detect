@@ -11,8 +11,12 @@ S2-2 범위(인코딩 디코딩):
     디코딩 깊이·스캔 길이·구간 수·출력 길이를 ``DecodeLimits`` 로 제한한다 (DoS 방지).
     Base64 는 대소문자를 구분하므로 ``fold_case`` 보다 **먼저** 실행해야 한다.
 
-한국어 특화 정규화(S2-3), ``normalize()`` 공개 인터페이스(S2-4)는
-이후 세그먼트에서 추가한다.
+S2-3 범위(한국어 특화 정규화):
+    1. 글자 사이 공백·특수문자 삽입 제거 (``무.시.해`` → ``무시해``)
+    2. 분리된 호환 자모 결합 (``ㅇㅣㅈㅓㄴ`` → ``이전``)
+    한영 자판 오타 변환(``dlwjs`` → ``이전``)은 선택 항목으로, 아래 "향후 과제" 메모만 남긴다.
+
+``normalize()`` 공개 인터페이스(S2-4)는 이후 세그먼트에서 추가한다.
 """
 
 from __future__ import annotations
@@ -30,12 +34,15 @@ __all__ = [
     "DecodedSegment",
     "append_decoded",
     "collapse_whitespace",
+    "compose_jamo",
     "decode_layers",
     "find_encoded",
     "fold_case",
     "map_homoglyphs",
     "nfkc",
+    "normalize_korean",
     "normalize_unicode",
+    "remove_inserted_separators",
     "strip_invisible",
 ]
 
@@ -408,3 +415,119 @@ def append_decoded(text: str, limits: DecodeLimits = DEFAULT_DECODE_LIMITS) -> s
     if not segments:
         return text
     return "\n".join([text, *(seg.decoded for seg in segments)])
+
+
+# ---------------------------------------------------------------------------
+# 6. 한국어 특화 정규화 (S2-3)
+# ---------------------------------------------------------------------------
+
+# 한글 음절(가–힣) 또는 호환 자모(ㄱ–ㆎ)
+_HANGUL = "\uac00-\ud7a3\u3131-\u318e"
+# 한글 한 글자씩 사이에 공백·구두점·기호(1~3자)를 끼워 넣은 구간: "무.시.해", "이 전", "ㅇ-ㅣ-ㅈ"
+# - 각 토큰은 한글 **한 글자**여야 한다 (일반 띄어쓰기 "이전 지시를"은 건드리지 않음)
+# - 토큰이 3개 이상이어야 한다 (구분자 2개 이상)
+# - 숫자·영문은 구분자로 보지 않는다
+_SEP = r"[^\w\n]|_"
+_INSERTED_SEP_RE = re.compile(
+    rf"(?<![{_HANGUL}])[{_HANGUL}](?=(?:{_SEP}))"
+    rf"(?:(?:{_SEP}){{1,3}}[{_HANGUL}](?![{_HANGUL}])){{2,}}"
+)
+_NON_HANGUL_RE = re.compile(rf"[^{_HANGUL}]+")
+
+
+def remove_inserted_separators(text: str) -> str:
+    """한글 글자 사이에 끼워 넣은 공백·구두점·기호를 제거한다.
+
+    ``무.시.해`` → ``무시해``, ``이 전 지 시`` → ``이전지시``, ``ㅇ/ㅣ/ㅈ/ㅓ/ㄴ`` → ``ㅇㅣㅈㅓㄴ``.
+    두 글자 이상인 단어 사이의 일반 띄어쓰기는 그대로 둔다.
+    """
+    return _INSERTED_SEP_RE.sub(lambda m: _NON_HANGUL_RE.sub("", m.group()), text)
+
+
+# --- 자모 결합 ---
+
+_CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+_JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+_JONG = ["", *"ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"]
+_CHO_IDX = {c: i for i, c in enumerate(_CHO)}
+_JUNG_IDX = {c: i for i, c in enumerate(_JUNG)}
+_JONG_IDX = {c: i for i, c in enumerate(_JONG) if c}
+_VOWEL_PAIRS = {
+    ("ㅗ", "ㅏ"): "ㅘ", ("ㅗ", "ㅐ"): "ㅙ", ("ㅗ", "ㅣ"): "ㅚ",
+    ("ㅜ", "ㅓ"): "ㅝ", ("ㅜ", "ㅔ"): "ㅞ", ("ㅜ", "ㅣ"): "ㅟ",
+    ("ㅡ", "ㅣ"): "ㅢ",
+}  # fmt: skip
+_FINAL_PAIRS = {
+    ("ㄱ", "ㅅ"): "ㄳ", ("ㄴ", "ㅈ"): "ㄵ", ("ㄴ", "ㅎ"): "ㄶ",
+    ("ㄹ", "ㄱ"): "ㄺ", ("ㄹ", "ㅁ"): "ㄻ", ("ㄹ", "ㅂ"): "ㄼ", ("ㄹ", "ㅅ"): "ㄽ",
+    ("ㄹ", "ㅌ"): "ㄾ", ("ㄹ", "ㅍ"): "ㄿ", ("ㄹ", "ㅎ"): "ㅀ",
+    ("ㅂ", "ㅅ"): "ㅄ",
+}  # fmt: skip
+
+
+def compose_jamo(text: str) -> str:
+    """분리된 호환 자모(ㄱ, ㅏ …)를 한글 음절로 결합한다.
+
+    ``ㅇㅣㅈㅓㄴ`` → ``이전``, ``ㅁㅜㅅㅣㅎㅐ`` → ``무시해``, ``ㄷㅏㄹㄱ`` → ``닭``.
+
+    규칙:
+    - 초성 자음 + 모음으로 시작하는 곳에서만 음절을 만든다 (``ㅋㅋㅋ``, ``ㅠㅠ`` 는 그대로).
+    - 모음 뒤 자음은 다음 글자가 모음이면 다음 음절의 초성, 아니면 받침으로 붙인다.
+    - 같은 자음이 반복되고 그 뒤에 모음이 없으면 받침으로 붙이지 않는다
+      (``ㅅㅣㅋㅋㅋ`` → ``시ㅋㅋㅋ``; 웃음 표현 보호).
+    - 이미 완성된 음절에는 받침을 덧붙이지 않는다 (``그래ㅋㅋ`` 보호).
+    """
+    n = len(text)
+
+    def is_vowel(i: int) -> bool:
+        return i < n and text[i] in _JUNG_IDX
+
+    out: list[str] = []
+    i = 0
+    while i < n:
+        c = text[i]
+        if c not in _CHO_IDX or not is_vowel(i + 1):
+            out.append(c)
+            i += 1
+            continue
+
+        cho = _CHO_IDX[c]
+        vowel = text[i + 1]
+        i += 2
+        if i < n and (vowel, text[i]) in _VOWEL_PAIRS:
+            vowel = _VOWEL_PAIRS[(vowel, text[i])]
+            i += 1
+
+        final = ""
+        if (
+            i < n
+            and text[i] in _JONG_IDX
+            and not is_vowel(i + 1)
+            and not (i + 1 < n and text[i + 1] == text[i] and not is_vowel(i + 2))
+        ):
+            final = text[i]
+            i += 1
+            if i < n and (final, text[i]) in _FINAL_PAIRS and not is_vowel(i + 1):
+                final = _FINAL_PAIRS[(final, text[i])]
+                i += 1
+
+        jong = _JONG_IDX.get(final, 0)
+        out.append(chr(0xAC00 + (cho * 21 + _JUNG_IDX[vowel]) * 28 + jong))
+    return "".join(out)
+
+
+def normalize_korean(text: str) -> str:
+    """S2-3 한국어 특화 정규화: 삽입 구분자 제거 → 자모 결합.
+
+    구분자를 먼저 지워야 ``ㅇ.ㅣ.ㅈ.ㅓ.ㄴ`` 같은 입력도 자모 결합까지 이어진다.
+    """
+    return compose_jamo(remove_inserted_separators(text))
+
+
+# --- 향후 과제 (선택 항목, 미구현) -------------------------------------------
+# 한영 자판 오타 변환: 한글을 영문 자판 상태로 입력한 문자열(``dlwjs wltlfmf andtlgo``
+# → ``이전 지시를 무시해``)을 되돌리는 변환.
+# - 구현 시 두벌식 키 매핑(q→ㅂ, w→ㅈ … , 대문자 Q→ㅃ 등) 후 compose_jamo 로 결합하면 된다.
+# - 일반 영어 단어를 오변환하는 오탐 위험이 커서, 원문을 바꾸지 말고 S2-2 처럼
+#   "변환 결과를 덧붙이는" 방식 + 변환 결과가 한글 음절로 잘 결합되는 경우에만 채택하는
+#   방식을 권장한다.
