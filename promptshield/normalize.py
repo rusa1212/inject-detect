@@ -16,7 +16,15 @@ S2-3 범위(한국어 특화 정규화):
     2. 분리된 호환 자모 결합 (``ㅇㅣㅈㅓㄴ`` → ``이전``)
     한영 자판 오타 변환(``dlwjs`` → ``이전``)은 선택 항목으로, 아래 "향후 과제" 메모만 남긴다.
 
-``normalize()`` 공개 인터페이스(S2-4)는 이후 세그먼트에서 추가한다.
+S2-4 공개 인터페이스:
+    ``normalize(text) -> NormalizedText`` 가 위 단계를 정해진 순서로 실행하고
+    원문·정규화 텍스트·실제로 적용된 변환 목록·디코딩 구간을 함께 돌려준다.
+
+    >>> r = normalize("ＩＧＮ\\u200bＯＲＥ previous")
+    >>> r.text
+    'ignore previous'
+    >>> r.transforms
+    ('invisible', 'nfkc', 'casefold')
 """
 
 from __future__ import annotations
@@ -30,8 +38,11 @@ from urllib.parse import unquote_plus
 
 __all__ = [
     "HOMOGLYPHS",
+    "TRANSFORMS",
     "DecodeLimits",
     "DecodedSegment",
+    "NormalizedText",
+    "normalize",
     "append_decoded",
     "collapse_whitespace",
     "compose_jamo",
@@ -531,3 +542,88 @@ def normalize_korean(text: str) -> str:
 # - 일반 영어 단어를 오변환하는 오탐 위험이 커서, 원문을 바꾸지 말고 S2-2 처럼
 #   "변환 결과를 덧붙이는" 방식 + 변환 결과가 한글 음절로 잘 결합되는 경우에만 채택하는
 #   방식을 권장한다.
+
+
+# ---------------------------------------------------------------------------
+# 7. 공개 인터페이스 (S2-4)
+# ---------------------------------------------------------------------------
+
+# 변환 이름 (NormalizedText.transforms 에 실행 순서대로, 텍스트가 실제로 바뀐 경우만 기록)
+TRANSFORMS: tuple[str, ...] = (
+    "invisible",  # 보이지 않는 문자·제어문자 제거, 태그 문자 복원
+    "nfkc",  # NFKC (전각·수학 문자·합자 등)
+    "decode:hex",  # hex 디코딩 결과 덧붙임
+    "decode:url",  # URL 디코딩 결과 덧붙임
+    "decode:base64",  # Base64 디코딩 결과 덧붙임
+    "homoglyph",  # 동형문자 → 라틴
+    "korean_separator",  # 한글 글자 사이 삽입 구분자 제거
+    "jamo",  # 분리 자모 결합
+    "casefold",  # 대소문자 통일
+    "whitespace",  # 연속 공백·줄바꿈 정리
+)
+
+
+@dataclass(frozen=True)
+class NormalizedText:
+    """``normalize()`` 결과.
+
+    Attributes:
+        original: 입력 원문 (그대로 보존).
+        text: 정규화된 텍스트. 룰·모델은 이 텍스트를 검사한다.
+            인코딩 구간이 있으면 디코딩 결과가 뒤에 덧붙어 있다.
+        transforms: 실제로 텍스트를 바꾼 변환 이름 (``TRANSFORMS`` 중, 실행 순서대로).
+        decoded: 디코딩된 구간 목록 (원문 위치·깊이 포함).
+    """
+
+    original: str
+    text: str
+    transforms: tuple[str, ...] = ()
+    decoded: tuple[DecodedSegment, ...] = ()
+
+    @property
+    def changed(self) -> bool:
+        """정규화로 텍스트가 바뀌었는지."""
+        return self.text != self.original
+
+
+def _clean(text: str) -> str:
+    return nfkc(strip_invisible(text))
+
+
+def normalize(text: str, *, limits: DecodeLimits = DEFAULT_DECODE_LIMITS) -> NormalizedText:
+    """입력을 정규화해 ``NormalizedText`` 로 돌려준다.
+
+    실행 순서와 이유:
+        1. invisible   — 보이지 않는 문자가 다른 단계의 패턴 매칭을 끊지 않도록 가장 먼저
+        2. nfkc        — 전각 Base64(``ａＧＶｓ…``)도 디코딩되도록 디코딩 전에
+        3. decode:*    — Base64 는 대소문자를 구분하므로 casefold 전에. 디코딩 결과에도
+                         1~2 단계를 적용한 뒤 원문 뒤에 덧붙이고, 이후 단계는 전체에 적용
+        4. homoglyph   — 디코딩된 페이로드 안의 동형문자도 함께 처리
+        5. korean_separator → 6. jamo — 구분자를 지운 뒤 자모 결합 (``ㅇ.ㅣ.ㅈ.ㅓ.ㄴ``)
+        7. casefold    — 한국어 단계와 무관하므로 뒤쪽 아무 곳이나 가능
+        8. whitespace  — 앞 단계에서 생긴 공백까지 마지막에 한 번에 정리
+    """
+    transforms: list[str] = []
+
+    def step(name: str, before: str, after: str) -> str:
+        if after != before:
+            transforms.append(name)
+        return after
+
+    cur = step("invisible", text, strip_invisible(text))
+    cur = step("nfkc", cur, nfkc(cur))
+
+    segments = tuple(decode_layers(cur, limits))
+    if segments:
+        for encoding in ("hex", "url", "base64"):
+            if any(seg.encoding == encoding for seg in segments):
+                transforms.append(f"decode:{encoding}")
+        cur = "\n".join([cur, *(_clean(seg.decoded) for seg in segments)])
+
+    cur = step("homoglyph", cur, map_homoglyphs(cur))
+    cur = step("korean_separator", cur, remove_inserted_separators(cur))
+    cur = step("jamo", cur, compose_jamo(cur))
+    cur = step("casefold", cur, fold_case(cur))
+    cur = step("whitespace", cur, collapse_whitespace(cur))
+
+    return NormalizedText(original=text, text=cur, transforms=tuple(transforms), decoded=segments)
