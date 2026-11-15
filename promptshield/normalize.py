@@ -6,18 +6,32 @@ S2-1 범위(유니코드 정규화):
     3. 동형문자(homoglyph) 매핑 (키릴/그리스 등 → 라틴)
     4. 대소문자 통일(casefold) 및 연속 공백 정리
 
-인코딩 디코딩(S2-2), 한국어 특화 정규화(S2-3), ``normalize()`` 공개 인터페이스(S2-4)는
+S2-2 범위(인코딩 디코딩):
+    Base64 / hex / URL 인코딩 구간을 찾아 디코딩하고, 디코딩 결과를 원문 뒤에 덧붙인다.
+    디코딩 깊이·스캔 길이·구간 수·출력 길이를 ``DecodeLimits`` 로 제한한다 (DoS 방지).
+    Base64 는 대소문자를 구분하므로 ``fold_case`` 보다 **먼저** 실행해야 한다.
+
+한국어 특화 정규화(S2-3), ``normalize()`` 공개 인터페이스(S2-4)는
 이후 세그먼트에서 추가한다.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 import unicodedata
+from dataclasses import dataclass
+from urllib.parse import unquote_plus
 
 __all__ = [
     "HOMOGLYPHS",
+    "DecodeLimits",
+    "DecodedSegment",
+    "append_decoded",
     "collapse_whitespace",
+    "decode_layers",
+    "find_encoded",
     "fold_case",
     "map_homoglyphs",
     "nfkc",
@@ -191,3 +205,206 @@ def normalize_unicode(text: str) -> str:
     text = map_homoglyphs(text)
     text = fold_case(text)
     return collapse_whitespace(text)
+
+
+# ---------------------------------------------------------------------------
+# 5. 인코딩 디코딩 (S2-2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DecodeLimits:
+    """디코딩 자원 제한 (DoS 방지).
+
+    Attributes:
+        max_depth: 중첩 디코딩 최대 깊이 (예: base64 안의 base64). 1 이면 한 겹만.
+        max_scan_chars: 한 텍스트에서 인코딩 구간을 찾을 최대 길이. 넘는 부분은 스캔하지 않는다.
+        max_segment_chars: 인코딩 구간 하나에서 디코딩할 최대 길이. 넘으면 앞부분만 디코딩한다.
+        max_segments: 전체 깊이를 통틀어 디코딩할 최대 구간 수.
+        max_total_decoded_chars: 디코딩 결과 문자 수 합계 상한.
+        min_base64_chars: Base64 후보로 볼 최소 길이 (짧은 영단어 오탐 방지).
+        min_hex_chars: 연속 hex 문자열 후보로 볼 최소 길이 (짝수 자리).
+    """
+
+    max_depth: int = 3
+    max_scan_chars: int = 20_000
+    max_segment_chars: int = 8_192
+    max_segments: int = 32
+    max_total_decoded_chars: int = 32_768
+    min_base64_chars: int = 16
+    min_hex_chars: int = 16
+
+
+DEFAULT_DECODE_LIMITS = DecodeLimits()
+
+
+@dataclass(frozen=True)
+class DecodedSegment:
+    """디코딩된 구간 하나.
+
+    ``start``/``end`` 는 이 구간을 찾은 텍스트 기준 위치다. ``depth == 1`` 이면 원문,
+    ``depth >= 2`` 이면 바로 윗단계 디코딩 결과(``DecodedSegment.decoded``) 기준이다.
+    """
+
+    encoding: str  # "base64" | "hex" | "url"
+    start: int
+    end: int
+    depth: int
+    decoded: str
+
+
+# 앞뒤가 같은 문자 집합이 아닐 때만 구간으로 본다 (단어 중간 매칭 방지)
+_B64_RE = re.compile(r"(?<![A-Za-z0-9+/=_-])[A-Za-z0-9+/_-]{2,}={0,2}(?![A-Za-z0-9+/=_-])")
+_HEX_CONTIG_RE = re.compile(r"(?<![0-9A-Za-z])(?:0x)?((?:[0-9A-Fa-f]{2})+)(?![0-9A-Za-z])")
+_HEX_ESCAPED_RE = re.compile(r"(?:\\x[0-9A-Fa-f]{2}){4,}")
+_HEX_SEPARATED_RE = re.compile(
+    r"(?<![0-9A-Za-z])(?:[0-9A-Fa-f]{2}[ :,-]){3,}[0-9A-Fa-f]{2}(?![0-9A-Za-z])"
+)
+# 공백 단위 토큰. `\S*%XX\S*` 형태는 긴 무공백 입력에서 O(n^2) 백트래킹이 생기므로
+# 토큰만 잘라내고 % 이스케이프 개수는 _decode_url 에서 확인한다.
+_URL_TOKEN_RE = re.compile(r"\S+")
+_URL_ESCAPE_RE = re.compile(r"%[0-9A-Fa-f]{2}")
+_HEX_DIGITS_RE = re.compile(r"[0-9A-Fa-f]{2}")
+
+
+def _looks_like_text(s: str) -> bool:
+    """디코딩 결과가 사람이 읽을 수 있는 텍스트인지 (바이너리·쓰레기 결과 배제)."""
+    if len(s.strip()) < 2:
+        return False
+    printable = sum(1 for ch in s if ch.isprintable() or ch in "\n\r\t")
+    if printable / len(s) < 0.95:
+        return False
+    # 글자(한글 포함)·숫자가 최소 절반은 되어야 함
+    alnum = sum(1 for ch in s if ch.isalnum() or ch.isspace())
+    return alnum / len(s) >= 0.6
+
+
+def _bytes_to_text(data: bytes) -> str | None:
+    try:
+        s = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return s if _looks_like_text(s) else None
+
+
+def _decode_base64(token: str, limits: DecodeLimits) -> str | None:
+    body = token.rstrip("=")
+    if len(body) < limits.min_base64_chars:
+        return None
+    # 순수 소문자/순수 대문자/순수 숫자 등은 일반 단어·숫자일 가능성이 높음 → 최소 2종류 섞여야 함
+    kinds = sum(
+        (
+            any(c.islower() for c in body),
+            any(c.isupper() for c in body),
+            any(c.isdigit() or c in "+/-_" for c in body),
+        )
+    )
+    if kinds < 2:
+        return None
+    body = body[: limits.max_segment_chars]
+    body = body[: len(body) - len(body) % 4] if len(body) % 4 == 1 else body
+    body = body.replace("-", "+").replace("_", "/")
+    try:
+        data = base64.b64decode(body + "=" * (-len(body) % 4), validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return _bytes_to_text(data)
+
+
+def _decode_hex(digits: str, limits: DecodeLimits) -> str | None:
+    digits = digits[: limits.max_segment_chars]
+    digits = digits[: len(digits) - len(digits) % 2]
+    try:
+        data = bytes.fromhex(digits)
+    except ValueError:
+        return None
+    return _bytes_to_text(data)
+
+
+def _decode_url(token: str, limits: DecodeLimits) -> str | None:
+    if len(_URL_ESCAPE_RE.findall(token)) < 2:
+        return None
+    s = unquote_plus(token[: limits.max_segment_chars], errors="strict")
+    if s == token or not _looks_like_text(s):
+        return None
+    return s
+
+
+def find_encoded(
+    text: str, limits: DecodeLimits = DEFAULT_DECODE_LIMITS, *, depth: int = 1
+) -> list[DecodedSegment]:
+    """``text`` 한 겹에서 인코딩 구간을 찾아 디코딩한다 (재귀 없음).
+
+    hex → URL → Base64 순서로 찾고, 앞에서 채택된 구간과 겹치는 후보는 버린다.
+    결과는 시작 위치 순으로 정렬된다.
+    """
+    scan = text[: limits.max_scan_chars]
+    found: list[DecodedSegment] = []
+    taken: list[tuple[int, int]] = []
+
+    def overlaps(a: int, b: int) -> bool:
+        return any(a < e and s < b for s, e in taken)
+
+    def add(encoding: str, a: int, b: int, decoded: str | None) -> None:
+        if decoded is None or overlaps(a, b):
+            return
+        taken.append((a, b))
+        found.append(DecodedSegment(encoding, a, b, depth, decoded))
+
+    for m in _HEX_ESCAPED_RE.finditer(scan):
+        add("hex", m.start(), m.end(), _decode_hex(m.group().replace("\\x", ""), limits))
+    for m in _HEX_SEPARATED_RE.finditer(scan):
+        digits = "".join(_HEX_DIGITS_RE.findall(m.group()))
+        add("hex", m.start(), m.end(), _decode_hex(digits, limits))
+    for m in _HEX_CONTIG_RE.finditer(scan):
+        if len(m.group(1)) >= limits.min_hex_chars:
+            add("hex", m.start(), m.end(), _decode_hex(m.group(1), limits))
+    for m in _URL_TOKEN_RE.finditer(scan):
+        add("url", m.start(), m.end(), _decode_url(m.group(), limits))
+    for m in _B64_RE.finditer(scan):
+        add("base64", m.start(), m.end(), _decode_base64(m.group(), limits))
+
+    found.sort(key=lambda seg: seg.start)
+    return found
+
+
+def decode_layers(text: str, limits: DecodeLimits = DEFAULT_DECODE_LIMITS) -> list[DecodedSegment]:
+    """인코딩 구간을 ``limits.max_depth`` 겹까지 재귀적으로 디코딩한다.
+
+    너비 우선으로 진행하며, 구간 수(``max_segments``)나 출력 길이
+    (``max_total_decoded_chars``) 한도에 닿으면 즉시 멈춘다.
+    """
+    results: list[DecodedSegment] = []
+    total_chars = 0
+    frontier = [text]
+    for depth in range(1, limits.max_depth + 1):
+        next_frontier: list[str] = []
+        for source in frontier:
+            for seg in find_encoded(source, limits, depth=depth):
+                if len(results) >= limits.max_segments:
+                    return results
+                remaining = limits.max_total_decoded_chars - total_chars
+                if remaining <= 0:
+                    return results
+                if len(seg.decoded) > remaining:
+                    seg = DecodedSegment(
+                        seg.encoding, seg.start, seg.end, seg.depth, seg.decoded[:remaining]
+                    )
+                results.append(seg)
+                total_chars += len(seg.decoded)
+                next_frontier.append(seg.decoded)
+        if not next_frontier:
+            break
+        frontier = next_frontier
+    return results
+
+
+def append_decoded(text: str, limits: DecodeLimits = DEFAULT_DECODE_LIMITS) -> str:
+    """원문 뒤에 디코딩 결과를 줄바꿈으로 이어 붙인다 (인코딩 구간이 없으면 원문 그대로).
+
+    원문을 지우지 않고 덧붙이므로, 원문 자체의 패턴과 숨겨진 페이로드를 모두 검사할 수 있다.
+    """
+    segments = decode_layers(text, limits)
+    if not segments:
+        return text
+    return "\n".join([text, *(seg.decoded for seg in segments)])
