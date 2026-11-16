@@ -1,0 +1,189 @@
+# 영어 인젝션 룰셋 (S3-2).
+# - 패턴은 normalize() 결과(소문자, 연속 공백 1칸, 동형문자·전각 정리, 디코딩 결과 덧붙임)에 매칭된다.
+# - 단어 사이 간격은 (?:\S+\s+){0,N} 처럼 반드시 상한을 둔다 (ReDoS 방지, 중첩 무한 반복 금지).
+# - weight 는 "이 패턴 하나만으로 얼마나 공격이 확실한가" (0~1). 점수 결합은 S3-4 에서 정한다.
+#   0.9 거의 확실 / 0.7 강한 신호 / 0.5 문맥 따라 정상 문장에도 나올 수 있음
+# - 문자열 값은 따옴표로 감싼다 (YAML 1.1 에서 on/off/yes/no 가 불리언이 되는 문제 방지).
+version: 1
+rules:
+  # ------------------------------------------------------------ 지시 무시 (instruction_override)
+  - id: 'en-override-ignore-previous'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'ignore/disregard/forget ... previous/above ... instructions'
+    pattern: '\b(?:ignore|disregard|forget|skip|overlook|discard|drop|abandon|neglect)\s+(?:\S+\s+){0,3}(?:previous|prior|above|earlier|preceding|former|initial|original|old|foregoing)\s+(?:\S+\s+){0,2}(?:instructions?|directions?|prompts?|rules|guidelines|commands?|directives?|context|messages?|orders|text|conversation)\b'
+    weight: 0.9
+
+  - id: 'en-override-ignore-your-rules'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'ignore/override all of your rules / your instructions'
+    pattern: '\b(?:ignore|disregard|forget|override|bypass|circumvent|discard)\s+(?:all\s+(?:of\s+)?|any\s+(?:of\s+)?|every\s+)?(?:your|these|those|all)\s+(?:\S+\s+){0,2}(?:instructions|rules|guidelines|directives|restrictions|constraints|programming|guardrails|policies|training)\b'
+    weight: 0.8
+
+  - id: 'en-override-stop-following'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'stop following / do not follow your instructions'
+    pattern: '\b(?:(?:stop|cease|quit)\s+following|do\s*n.?t\s+follow|do\s+not\s+follow|no\s+longer\s+follow)\s+(?:your|the|any|those|these)\s+(?:\S+\s+){0,2}(?:instructions|rules|guidelines|programming|directives|policies)\b'
+    weight: 0.8
+
+  - id: 'en-override-new-instructions'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'your new/real instructions are ...'
+    pattern: '\b(?:your\s+)?(?:new|updated|real|actual|true|revised)\s+(?:system\s+)?(?:instructions?|directives?|rules)\s*(?::|are\b|is\b)'
+    weight: 0.6
+
+  - id: 'en-override-override-system'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'override the system prompt / safety'
+    pattern: '\boverride\s+(?:\S+\s+){0,2}(?:system\s+prompt|system\s+instructions|safety|programming|restrictions|guardrails)\b'
+    weight: 0.7
+
+  - id: 'any-override-fake-delimiter'
+    lang: 'any'
+    category: 'instruction_override'
+    description: '채팅 템플릿/시스템 구분자 위조 (<|im_start|>, [system], </system> 등)'
+    pattern: '(?:<\|?/?(?:system|im_start|im_end|endoftext)\|?>|\[/?(?:system|inst)\]|<</?sys>>|#{2,}\s*(?:system|new\s+instructions?)\b)'
+    weight: 0.6
+
+  - id: 'en-override-end-of-prompt'
+    lang: 'en'
+    category: 'instruction_override'
+    description: 'end of system prompt / the conversation above was a test'
+    pattern: '\b(?:end\s+of\s+(?:the\s+)?(?:system\s+prompt|instructions|prompt)|(?:the\s+)?(?:above|previous)\s+(?:\S+\s+){0,2}(?:was|were)\s+(?:just\s+)?(?:a\s+)?(?:test|fake|joke))\b'
+    weight: 0.6
+
+  # ------------------------------------------------------------ 역할 탈취 (role_hijack)
+  - id: 'en-role-you-are-now'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'you are now (a/an/called/going to act as) ...'
+    pattern: '\byou\s+are\s+now\s+(?:a|an|the|my|called|named|going\s+to\s+(?:be|act|pretend|play))\b'
+    weight: 0.45  # S3-4: 페르소나 지정만으로는 차단하지 않음 (다른 신호와 결합 시에만 임계값 초과)
+
+  - id: 'en-role-no-longer'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'you are no longer / not an AI, assistant, bound by ...'
+    pattern: '\b(?:you\s+are|you.?re)\s+(?:no\s+longer|not)\s+(?:an?\s+)?(?:ai|assistant|language\s+model|chatbot|llm|bound|restricted|limited|chatgpt|claude|gpt)\b'
+    weight: 0.8
+
+  - id: 'en-role-from-now-on'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'from now on you are / will act as ...'
+    pattern: '\bfrom\s+now\s+on\s*,?\s*(?:you\s+(?:are|will\s+(?:be|act|respond|answer|behave)|shall\s+be|must\s+(?:act|be|respond))|act\s+as|you.?re)\b'
+    weight: 0.45  # S3-4: 페르소나 지정만으로는 차단하지 않음 (다른 신호와 결합 시에만 임계값 초과)
+
+  - id: 'en-role-act-as-unrestricted'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'act as an unrestricted/evil/unfiltered AI'
+    pattern: '\b(?:act|behave|respond|roleplay|role-play|pose)\s+(?:as|like)\s+(?:if\s+you\s+(?:are|were)\s+)?(?:an?\s+|the\s+)?(?:\S+\s+)?(?:unrestricted|unfiltered|uncensored|evil|jailbroken|rogue|malicious|amoral|unethical)\b'
+    weight: 0.8
+
+  - id: 'en-role-pretend-unbound'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'pretend to be ... without rules / not bound'
+    pattern: '\bpretend\s+(?:to\s+be|you\s+(?:are|were|have))\s+(?:\S+\s+){0,4}(?:without\s+(?:any\s+)?(?:rules|restrictions|limits|filters|guidelines)|no\s+(?:rules|restrictions|limits|filters)|not\s+bound|unrestricted|unfiltered|uncensored|evil)\b'
+    weight: 0.7
+
+  - id: 'en-role-new-persona'
+    lang: 'en'
+    category: 'role_hijack'
+    description: 'your new role/persona/identity is ...'
+    pattern: '\byour\s+new\s+(?:role|persona|identity|name|purpose|personality|character)\s+(?:is|will\s+be)\b'
+    weight: 0.45  # S3-4: 페르소나 지정만으로는 차단하지 않음 (다른 신호와 결합 시에만 임계값 초과)
+
+  # ------------------------------------------------------------ 탈옥 (jailbreak)
+  - id: 'en-jb-dan'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'DAN (Do Anything Now) 페르소나'
+    pattern: '\b(?:(?:you\s+are|you.?re|act\s+as|become|enable|activate|be|called)\s+(?:now\s+)?(?:a\s+)?dan\b|do\s+anything\s+now\b|dan\s+mode\b)'
+    weight: 0.9
+
+  - id: 'en-jb-known-persona'
+    lang: 'en'
+    category: 'jailbreak'
+    description: '알려진 탈옥 페르소나 이름'
+    pattern: '\b(?:betterdan|better\s+dan|anti-?dan|evilbot|evil\s+confidant|stan\s+mode|dude\s+mode|aim\s+mode|developer\s+mode\s+output)\b'
+    weight: 0.8
+
+  - id: 'en-jb-special-mode'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'developer/god/jailbreak mode enabled'
+    # S3-4: "how to enable developer mode (on android)" 같은 사용법 질문은 제외
+    pattern: '\b(?<!how to )(?<!how do i )(?<!how do you )(?<!how can i )(?<!how should i )(?<!steps to )(?<!ways to )(?<!way to )(?:(?:enable|activate|enter|switch\s+to|turn\s+on|unlock|engage)\s+(?:the\s+)?(?:developer|dev|god|debug|jailbreak|unrestricted|unfiltered|admin|sudo|root)\s+mode(?!\s+(?:on|in|for)\s+(?:my\s+|the\s+|your\s+|a\s+)?(?:android|iphone|ios|phone|pixel|samsung|galaxy|chrome|chromebook|windows|mac|macos|device|browser|xbox|tv|router|app))|(?:developer|dev|god|jailbreak|unrestricted|unfiltered|sudo)\s+mode\s+(?:is\s+)?(?:enabled|activated|on(?=\s*(?:[.!,:;)]|$))|unlocked|engaged))\b'
+    weight: 0.8
+
+  - id: 'en-jb-disable-safety'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'without/bypass/disable ethical·safety guidelines/filters'
+    pattern: '\b(?:without|no|free\s+(?:from|of)|ignore|ignoring|bypass|bypassing|disable|disabling|remove|turn\s+off|lift)\s+(?:any\s+|all\s+|your\s+|the\s+)?(?:ethical|moral|safety|content|openai|anthropic)\s+(?:\S+\s+)?(?:guidelines|restrictions|filters?|limits|limitations|constraints|policies|guardrails|boundaries|considerations)\b'
+    weight: 0.7
+
+  - id: 'en-jb-unrestricted-ai'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'unrestricted/uncensored AI·mode·version'
+    pattern: '\b(?:unrestricted|unfiltered|uncensored|unlimited|jailbroken|unchained)\s+(?:ai|mode|assistant|model|version|chatbot|llm|gpt)\b'
+    weight: 0.7
+
+  - id: 'en-jb-no-restrictions'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'you have no restrictions / can do anything'
+    pattern: '\byou\s+(?:have|has)\s+no\s+(?:restrictions|limitations|limits|filters|rules|boundaries|guidelines)\b|\byou\s+can\s+(?:now\s+)?do\s+anything\b|\b(?:not|never)\s+(?:bound|restricted)\s+by\s+(?:any\s+)?(?:rules|restrictions|guidelines|policies|ethics)\b'
+    weight: 0.7
+
+  - id: 'en-jb-mention'
+    lang: 'en'
+    category: 'jailbreak'
+    description: 'jailbreak 단어 언급 (설명 요청 등 정상 문장에도 나와 가중치 낮음)'
+    pattern: '\bjailbr(?:eak|eaking|oken)\b'
+    weight: 0.4
+
+  # ------------------------------------------------------------ 유출 요구 (prompt_leak)
+  - id: 'en-leak-reveal-prompt'
+    lang: 'en'
+    category: 'prompt_leak'
+    description: 'reveal/show/print your system prompt / initial instructions'
+    pattern: '\b(?:reveal|show|print|display|output|repeat|tell|give|share|disclose|dump|leak|expose|recite|spell\s+out|write\s+out|list|provide|send|paste)\s+(?:me\s+|us\s+)?(?:(?:your|the|its|this|that|entire|full|complete|whole|exact|current|original|initial)\s+){0,3}(?:system\s+(?:prompt|message|instructions)|(?:initial|original|hidden|secret|internal|developer|pre-?)\s*(?:prompt|instructions|message|rules|directives))\b'
+    weight: 0.9
+
+  - id: 'en-leak-what-is-prompt'
+    lang: 'en'
+    category: 'prompt_leak'
+    description: 'what is your system prompt / what are your instructions'
+    # "what are the instructions for assembling ..." 오탐 방지: the 뒤에는 system/hidden 등 수식어 필수
+    pattern: '\bwhat\s+(?:is|are|was|were|.s)\s+(?:your\s+(?:(?:system|initial|original|hidden|secret|exact|full)\s+)?(?:system\s+prompt|prompt|instructions|directives)|the\s+(?:(?:initial|original|hidden|secret|exact|full)\s+)?system\s+(?:prompt|instructions)|the\s+(?:initial|original|hidden|secret)\s+(?:prompt|instructions))\b'
+    weight: 0.6
+
+  - id: 'en-leak-repeat-above'
+    lang: 'en'
+    category: 'prompt_leak'
+    description: 'repeat the text above / everything before this'
+    # S3-4: "repeat the above steps for ..." 같은 작업 반복 요청은 제외
+    pattern: '\b(?:repeat|print|output|copy|echo|reproduce|recite)\s+(?:back\s+)?(?:(?:all|everything|the|of|text|words|content|messages?|lines|verbatim|exactly)\s+){0,4}(?:above|before\s+this|preceding|prior\s+to\s+this|so\s+far)\b(?!\s+(?:steps?|process|procedure|commands?|code|example|calculation|exercise|pattern|query|test|analysis|for\b))'
+    weight: 0.6
+
+  - id: 'en-leak-start-with'
+    lang: 'en'
+    category: 'prompt_leak'
+    description: 'begin your reply with "You are ..." (프롬프트 앞부분 유도)'
+    pattern: '\b(?:start|begin)\s+(?:your\s+(?:response|reply|answer|output)\s+)?with\s+(?:the\s+(?:words?|phrase)\s+)?["''“]?you\s+are\b'
+    weight: 0.6
+
+  - id: 'en-leak-instructions-given'
+    lang: 'en'
+    category: 'prompt_leak'
+    description: 'instructions you were given / told before this conversation'
+    pattern: '\b(?:instructions|rules|prompt|guidelines)\s+(?:that\s+)?you\s+(?:were|have\s+been)\s+(?:given|told|programmed\s+with|provided)\b'
+    weight: 0.6

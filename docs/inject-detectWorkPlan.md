@@ -103,19 +103,19 @@
 > 목표: 명백한 공격을 저비용으로 걸러내는 1단계 필터
 
 ### S3-1. 룰 스키마와 로더
-- [ ] YAML 룰 포맷 정의: `id`, `lang`, `category`(지시 무시/역할 탈취/탈옥/유출 요구), `pattern`, `weight`
-- [ ] 로더 및 정규식 사전 컴파일
+- [x] YAML 룰 포맷 정의: `id`, `lang`, `category`(지시 무시/역할 탈취/탈옥/유출 요구), `pattern`, `weight`
+- [x] 로더 및 정규식 사전 컴파일
 
 ### S3-2. 영어 룰
-- [ ] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
+- [x] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
 
 ### S3-3. 한국어 룰
-- [ ] "이전 지시 무시", "지금부터 너는", "시스템 프롬프트 알려줘" 등 어미·조사 변형을 고려한 패턴
-- [ ] 높임말/반말 변형 대응
+- [x] "이전 지시 무시", "지금부터 너는", "시스템 프롬프트 알려줘" 등 어미·조사 변형을 고려한 패턴
+- [x] 높임말/반말 변형 대응
 
 ### S3-4. 룰 점수 계산 및 테스트
-- [ ] `RuleEngine.scan(normalized) -> RuleResult` (점수 0~1, 매칭된 룰 ID 목록)
-- [ ] 하드 네거티브 예시로 오탐 테스트 ("프롬프트 인젝션이 뭔지 설명해줘" → 통과해야 함)
+- [x] `RuleEngine.scan(normalized) -> RuleResult` (점수 0~1, 매칭된 룰 ID 목록)
+- [x] 하드 네거티브 예시로 오탐 테스트 ("프롬프트 인젝션이 뭔지 설명해줘" → 통과해야 함)
 - **완료 기준**: 카테고리×언어별 탐지 테스트 + 하드 네거티브 테스트 통과
 
 ---
