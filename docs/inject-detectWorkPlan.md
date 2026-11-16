@@ -103,8 +103,8 @@
 > 목표: 명백한 공격을 저비용으로 걸러내는 1단계 필터
 
 ### S3-1. 룰 스키마와 로더
-- [ ] YAML 룰 포맷 정의: `id`, `lang`, `category`(지시 무시/역할 탈취/탈옥/유출 요구), `pattern`, `weight`
-- [ ] 로더 및 정규식 사전 컴파일
+- [x] YAML 룰 포맷 정의: `id`, `lang`, `category`(지시 무시/역할 탈취/탈옥/유출 요구), `pattern`, `weight`
+- [x] 로더 및 정규식 사전 컴파일
 
 ### S3-2. 영어 룰
 - [ ] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
