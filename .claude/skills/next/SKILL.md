@@ -13,4 +13,5 @@ AGENT.md의 작업 사이클을 그대로 수행한다. **git commit/push/add는
    지정된 세그먼트의 선행 조건이 미완료면 진행 전에 사용자에게 알리고 확인받는다.
 4. `docs/inject-detectWorkPlan.md`에서 해당 세그먼트 체크리스트를 읽고, 구현 → 검증한다.
 5. `PROGRESS.md` 상태를 `review`로 바꾸고, AGENT.md의 보고 형식으로 보고한 뒤 AskUserQuestion으로 승인을 묻고 **멈춘다**.
-6. 승인되면 체크박스·PROGRESS를 갱신하고, 커밋 메시지 제안과 스테이징할 파일 목록을 출력한 뒤 멈춘다.
+6. 승인되면 체크박스·PROGRESS를 갱신하고, `git status`로 변경·추가된 파일을 확인한 뒤
+   AGENT.md 5)의 형식대로 **파일별** `git add` + 커밋 메시지 제안을 의존 순서대로 출력하고 멈춘다.
