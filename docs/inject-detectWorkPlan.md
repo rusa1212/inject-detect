@@ -110,8 +110,8 @@
 - [x] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
 
 ### S3-3. 한국어 룰
-- [ ] "이전 지시 무시", "지금부터 너는", "시스템 프롬프트 알려줘" 등 어미·조사 변형을 고려한 패턴
-- [ ] 높임말/반말 변형 대응
+- [x] "이전 지시 무시", "지금부터 너는", "시스템 프롬프트 알려줘" 등 어미·조사 변형을 고려한 패턴
+- [x] 높임말/반말 변형 대응
 
 ### S3-4. 룰 점수 계산 및 테스트
 - [ ] `RuleEngine.scan(normalized) -> RuleResult` (점수 0~1, 매칭된 룰 ID 목록)
