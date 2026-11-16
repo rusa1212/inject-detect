@@ -107,7 +107,7 @@
 - [x] 로더 및 정규식 사전 컴파일
 
 ### S3-2. 영어 룰
-- [ ] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
+- [x] "ignore previous instructions", "you are now DAN", "reveal your system prompt" 등 카테고리별 패턴
 
 ### S3-3. 한국어 룰
 - [ ] "이전 지시 무시", "지금부터 너는", "시스템 프롬프트 알려줘" 등 어미·조사 변형을 고려한 패턴
