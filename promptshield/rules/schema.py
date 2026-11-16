@@ -14,6 +14,7 @@ YAML 룰 파일 포맷 (``version: 1``)::
 
 패턴은 ``normalize()`` 를 거친 텍스트(casefold·공백 정리 완료)에 매칭된다고 가정하고
 소문자로 작성한다. 컴파일 시 ``re.IGNORECASE`` 를 함께 걸어 두지만 이는 안전장치일 뿐이다.
+``lang: en`` 룰은 ``re.ASCII`` 로 컴파일한다 (``\\b`` 가 한글 조사 앞에서도 경계가 되도록).
 """
 
 from __future__ import annotations
@@ -54,7 +55,12 @@ class Rule:
     def __post_init__(self) -> None:
         # frozen 이므로 object.__setattr__ 로 컴파일 결과를 채운다.
         # 잘못된 정규식이면 re.error 가 그대로 올라간다 (로더가 RuleLoadError 로 감싼다).
-        object.__setattr__(self, "regex", re.compile(self.pattern, re.IGNORECASE))
+        flags = re.IGNORECASE
+        if self.lang == "en":
+            # 영어 룰의 \b 를 ASCII 기준으로: 유니코드 \b 는 한글도 단어 문자로 보므로
+            # "ignore previous instructions하고" 처럼 조사가 붙은 한영 혼용 공격을 놓친다.
+            flags |= re.ASCII
+        object.__setattr__(self, "regex", re.compile(self.pattern, flags))
 
     def search(self, text: str) -> re.Match[str] | None:
         """텍스트에서 첫 매칭을 찾는다."""
