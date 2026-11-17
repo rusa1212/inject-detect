@@ -48,4 +48,32 @@ EN_ATTACK_SOURCES: tuple[HFSource, ...] = (
     ),
 )
 
-ALL_SOURCES: tuple[HFSource, ...] = EN_ATTACK_SOURCES
+# S4-2: 정상 문장 (영어/한국어)
+BENIGN_SOURCES: tuple[HFSource, ...] = (
+    HFSource(
+        name="dolly_15k",
+        repo_id="databricks/databricks-dolly-15k",
+        revision="bdd27f4d94b9c1f951818a7da7fd7aeea5dbff1a",
+        files={"train": "databricks-dolly-15k.jsonl"},
+        license="cc-by-sa-3.0",
+        role="benign",
+        label_note="영어. `instruction` 컬럼 사용 (15,011건, 8개 category). 전부 정상(0).",
+    ),
+    HFSource(
+        name="klue_mrc",
+        repo_id="klue/klue",
+        revision="349481ec73fff722f88e0453ca05c77a447d967c",
+        files={
+            "train": "mrc/train-00000-of-00001.parquet",
+            "validation": "mrc/validation-00000-of-00001.parquet",
+        },
+        license="cc-by-sa-4.0",
+        role="benign",
+        label_note="한국어. `question` 컬럼만 사용 (train 17,554 / valid 5,841). 전부 정상(0).",
+    ),
+)
+
+# 공격 1건당 정상 문장 목표 수 (언어별 적용). 실제 샘플링은 S4-5 통합 단계에서 수행.
+BENIGN_PER_ATTACK: int = 2
+
+ALL_SOURCES: tuple[HFSource, ...] = EN_ATTACK_SOURCES + BENIGN_SOURCES
