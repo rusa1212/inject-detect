@@ -4,7 +4,7 @@
 **레포에는 원본 데이터와 빌드 산출물이 포함되지 않는다.** 아래 명령 한 번으로 전체를 재생성한다.
 
 ```bash
-pip install -e ".[ml]"      # huggingface_hub (원본 다운로드용)
+pip install -e ".[data]"    # huggingface_hub·pandas·pyarrow·numpy (다운로드·빌드용)
 python -m data.build        # 원본 다운로드(없을 때만) → 통합 → 분할 → data/processed/
 ```
 
