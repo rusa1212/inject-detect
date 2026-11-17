@@ -143,9 +143,9 @@
 - [x] 우회 공격 세트: Base64, 동형문자, 자모 분리, 공백 삽입 버전 자동 생성 스크립트 (`data/evasion.py`)
 
 ### S4-5. 통합 및 분할
-- [ ] 공통 스키마 (`text`, `label`, `lang`, `category`, `source`, `split`)
-- [ ] 중복·근접 중복 제거, train/valid/test 분리 (원문-번역 쌍은 같은 split에 배치해 누수 방지)
-- [ ] 데이터 카드(`data/README.md`): 구축 방법, 통계, 한계
+- [x] 공통 스키마 (`text`, `label`, `lang`, `category`, `source`, `split`) (+ `id`, `group`, `evasion`)
+- [x] 중복·근접 중복 제거, train/valid/test 분리 (원문-번역 쌍은 같은 split에 배치해 누수 방지)
+- [x] 데이터 카드(`data/README.md`): 구축 방법, 통계, 한계
 - **완료 기준**: `python -m data.build` 한 번으로 전체 데이터셋 재생성 가능, 원본 데이터는 레포에 미포함
 
 ---
