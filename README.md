@@ -53,7 +53,7 @@ LLM 앱 앞단에 붙이는 **한국어·영어 프롬프트 인젝션 탐지 �
 git clone https://github.com/rusa1212/inject-detect.git
 cd inject-detect
 pip install -e .            # 정규화 + 룰 엔진 (의존성: pyyaml)
-pip install -e ".[ml]"      # + 데이터셋 다운로드 (huggingface_hub)
+pip install -e ".[data]"    # + 데이터셋 다운로드·빌드 (huggingface_hub, pandas, pyarrow, numpy)
 pip install -e ".[dev]"     # + 개발 도구 (pytest, ruff, pre-commit)
 ```
 
