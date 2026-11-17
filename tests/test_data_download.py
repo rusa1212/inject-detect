@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from data import download
-from data.sources import ALL_SOURCES, EN_ATTACK_SOURCES
+from data.sources import ALL_SOURCES, BENIGN_PER_ATTACK, BENIGN_SOURCES, EN_ATTACK_SOURCES
 
 LICENSES_MD = Path(__file__).resolve().parents[1] / "data" / "LICENSES.md"
 
@@ -60,6 +60,33 @@ def test_download_source_copies_pinned_files(tmp_path, monkeypatch):
         assert path == tmp_path / "raw" / source.name / f"{split}.parquet"
         assert path.read_bytes() == b"PAR1"
     assert all(c[2] == "dataset" and c[3] == source.revision for c in calls)
+
+
+def test_benign_sources_cover_both_languages():
+    assert all(s in ALL_SOURCES for s in BENIGN_SOURCES)
+    assert all(s.role == "benign" for s in BENIGN_SOURCES)
+    repos = {s.repo_id for s in BENIGN_SOURCES}
+    assert {"databricks/databricks-dolly-15k", "klue/klue"} <= repos
+
+
+def test_benign_ratio_target():
+    assert BENIGN_PER_ATTACK == 2
+
+
+def test_download_source_keeps_original_extension(tmp_path, monkeypatch):
+    def fake_hf_hub_download(repo_id, filename, repo_type, revision):
+        p = tmp_path / "cache" / Path(filename).name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("{}", encoding="utf-8")
+        return str(p)
+
+    fake = types.ModuleType("huggingface_hub")
+    fake.hf_hub_download = fake_hf_hub_download
+    monkeypatch.setitem(sys.modules, "huggingface_hub", fake)
+
+    dolly = next(s for s in BENIGN_SOURCES if s.name == "dolly_15k")
+    saved = download.download_source(dolly, raw_dir=tmp_path / "raw")
+    assert saved == {"train": tmp_path / "raw" / "dolly_15k" / "train.jsonl"}
 
 
 def test_download_all_rejects_unknown(tmp_path):
