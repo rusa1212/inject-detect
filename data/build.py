@@ -34,11 +34,13 @@ import zlib
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, replace
+from functools import lru_cache
 from pathlib import Path
 
-import numpy as np
-
 from data.sources import BENIGN_PER_ATTACK
+
+# numpy·pandas는 빌드할 때만 필요하므로 함수 안에서 import한다 (``pip install -e ".[data]"``).
+# 모듈 import만으로는 런타임 최소 의존성(pyyaml) 외에 아무것도 요구하지 않는다.
 
 DATA_DIR = Path(__file__).resolve().parent
 RAW_DIR = DATA_DIR / "raw"
@@ -238,15 +240,32 @@ def shingles(text: str, k: int = 5) -> frozenset[str]:
 
 _NUM_PERM = 64
 _BANDS = 16
-_PRIME = np.uint64(4294967311)
-_rng = np.random.default_rng(20261117)
-_A = _rng.integers(1, 2**31, size=_NUM_PERM, dtype=np.uint64)
-_B = _rng.integers(0, 2**31, size=_NUM_PERM, dtype=np.uint64)
+_PRIME = 4294967311  # 2^32보다 큰 소수
+_MINHASH_SEED = 20261117
 
 
-def _minhash(sh: frozenset[str]) -> np.ndarray:
-    x = np.fromiter((zlib.crc32(s.encode("utf-8")) for s in sh), dtype=np.uint64, count=len(sh))
-    return ((np.outer(_A, x) + _B[:, None]) % _PRIME).min(axis=1)
+@lru_cache(maxsize=1)
+def _minhash_params():
+    """MinHash 해시 계수 (a, b). numpy를 처음 쓸 때 한 번만 만든다."""
+    import numpy as np
+
+    rng = np.random.default_rng(_MINHASH_SEED)
+    a = rng.integers(1, 2**31, size=_NUM_PERM, dtype=np.uint64)
+    b = rng.integers(0, 2**31, size=_NUM_PERM, dtype=np.uint64)
+    return a, b
+
+
+def _minhash_signatures(shingle_sets: list[frozenset[str]]):
+    """shingle 집합 목록 → (n, _NUM_PERM) uint64 MinHash 서명 행렬."""
+    import numpy as np
+
+    a, b = _minhash_params()
+    prime = np.uint64(_PRIME)
+    sigs = np.empty((len(shingle_sets), _NUM_PERM), dtype=np.uint64)
+    for i, sh in enumerate(shingle_sets):
+        x = np.fromiter((zlib.crc32(s.encode("utf-8")) for s in sh), dtype=np.uint64, count=len(sh))
+        sigs[i] = ((np.outer(a, x) + b[:, None]) % prime).min(axis=1)
+    return sigs
 
 
 def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
@@ -312,7 +331,7 @@ def deduplicate(rows: Iterable[Row]) -> tuple[list[Row], DedupReport]:
 
     # (2) MinHash LSH 후보 → 정확한 Jaccard·containment 확인
     sh = [shingles(r.text) for r in kept]
-    sigs = np.stack([_minhash(s) for s in sh]) if kept else np.empty((0, _NUM_PERM))
+    sigs = _minhash_signatures(sh)
     rows_per_band = _NUM_PERM // _BANDS
     candidates: set[tuple[int, int]] = set()
     for b in range(_BANDS):
