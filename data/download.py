@@ -7,7 +7,7 @@
 
 원본은 ``data/raw/<source>/<split><원본 확장자>`` (예: ``train.parquet``, ``train.jsonl``)에
 저장되며 레포에 커밋하지 않는다 (``.gitignore``).
-``huggingface_hub`` 필요: ``pip install -e ".[ml]"``.
+``huggingface_hub`` 필요: ``pip install -e ".[data]"``.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def download_source(source: HFSource, raw_dir: Path = RAW_DIR) -> dict[str, Path
     try:
         from huggingface_hub import hf_hub_download
     except ImportError as e:  # pragma: no cover - 환경 의존
-        raise RuntimeError('huggingface_hub가 필요합니다: pip install -e ".[ml]"') from e
+        raise RuntimeError('huggingface_hub가 필요합니다: pip install -e ".[data]"') from e
 
     out_dir = raw_dir / source.name
     out_dir.mkdir(parents=True, exist_ok=True)
