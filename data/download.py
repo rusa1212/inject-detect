@@ -5,8 +5,9 @@
     python -m data.download            # 전체 소스
     python -m data.download deepset_prompt_injections
 
-원본은 ``data/raw/<source>/<split>.parquet`` 에 저장되며 레포에 커밋하지 않는다
-(``.gitignore``). ``huggingface_hub`` 필요: ``pip install -e ".[ml]"``.
+원본은 ``data/raw/<source>/<split><원본 확장자>`` (예: ``train.parquet``, ``train.jsonl``)에
+저장되며 레포에 커밋하지 않는다 (``.gitignore``).
+``huggingface_hub`` 필요: ``pip install -e ".[ml]"``.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ def download_source(source: HFSource, raw_dir: Path = RAW_DIR) -> dict[str, Path
     """소스의 모든 split 파일을 고정 revision으로 내려받아 ``raw_dir/<name>/``에 저장.
 
     Returns:
-        split 이름 → 저장된 parquet 경로.
+        split 이름 → 저장된 파일 경로 (원본 확장자 유지).
     """
     try:
         from huggingface_hub import hf_hub_download
@@ -43,7 +44,7 @@ def download_source(source: HFSource, raw_dir: Path = RAW_DIR) -> dict[str, Path
             repo_type="dataset",
             revision=source.revision,
         )
-        dest = out_dir / f"{split}.parquet"
+        dest = out_dir / f"{split}{Path(repo_path).suffix}"
         shutil.copyfile(cached, dest)
         saved[split] = dest
     return saved
