@@ -125,8 +125,8 @@
 > 목표: 학습·평가용 한/영 데이터셋 확보. **프로젝트 핵심 기여 영역**
 
 ### S4-1. 영어 공격 데이터 수집
-- [ ] `deepset/prompt-injections`, Lakera gandalf, 탈옥 분류 데이터셋 다운로드 스크립트
-- [ ] 데이터셋별 라이선스 확인 → `data/LICENSES.md` 기록
+- [x] `deepset/prompt-injections`, Lakera gandalf, 탈옥 분류 데이터셋 다운로드 스크립트 (deepset만 채택)
+- [x] 데이터셋별 라이선스 확인 → `data/LICENSES.md` 기록
 
 ### S4-2. 정상 문장 수집
 - [ ] 영어/한국어 일반 대화·질의 데이터셋 다운로드 스크립트
