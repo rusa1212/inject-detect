@@ -166,7 +166,7 @@
 - [x] CPU 기준 평균 / p95, 워밍업 제외, 입력 길이 구간별 측정
 
 ### S5-4. 리포트 생성
-- [ ] 결과를 `eval/results/*.json`으로 저장, Markdown 결과표 자동 생성
+- [x] 결과를 `eval/results/*.json`으로 저장, Markdown 결과표 자동 생성
 - **완료 기준**: `python -m eval.run --detector rules` 실행 시 결과표 출력
 
 ---
