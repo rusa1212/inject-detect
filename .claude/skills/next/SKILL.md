@@ -1,9 +1,10 @@
 ---
 name: next
-description: AGENT.md 규칙에 따라 다음 세그먼트(또는 인자로 지정한 세그먼트 ID) 하나를 작업하고 승인을 요청한다. 커밋·푸시는 하지 않는다. 예) /next, /next S2-1
+description: AGENT.md 규칙에 따라 다음 세그먼트(또는 인자로 지정한 세그먼트 ID) 하나를 작업하고 승인을 요청한다. 승인 후 파일별 커밋 메시지를 제안하고, 허락받으면 커밋까지 한다. 푸시는 하지 않는다. 예) /next, /next S2-1
 ---
 
-AGENT.md의 작업 사이클을 그대로 수행한다. **git commit/push/add는 절대 실행하지 않는다.**
+AGENT.md의 작업 사이클을 그대로 수행한다.
+**커밋은 6)에서 명시적 허락을 받은 경우에만, 허락받은 목록 그대로 한다. `git push`는 절대 실행하지 않는다.**
 
 1. `git status`로 미커밋 변경을 확인한다. 있으면 사용자에게 먼저 커밋해달라고 요청하고 멈춘다
    (사용자가 "그냥 진행"이라고 하면 계속).
@@ -14,4 +15,9 @@ AGENT.md의 작업 사이클을 그대로 수행한다. **git commit/push/add는
 4. `docs/inject-detectWorkPlan.md`에서 해당 세그먼트 체크리스트를 읽고, 구현 → 검증한다.
 5. `PROGRESS.md` 상태를 `review`로 바꾸고, AGENT.md의 보고 형식으로 보고한 뒤 AskUserQuestion으로 승인을 묻고 **멈춘다**.
 6. 승인되면 체크박스·PROGRESS를 갱신하고, `git status`로 변경·추가된 파일을 확인한 뒤
-   AGENT.md 5)의 형식대로 **파일별** `git add` + 커밋 메시지 제안을 의존 순서대로 출력하고 멈춘다.
+   AGENT.md 5)의 형식대로 **파일별** `git add` + 커밋 메시지 제안을 의존 순서대로 출력한다.
+   그다음 AskUserQuestion으로 커밋 실행 허락을 묻는다 (커밋 실행 / 메시지 수정 / 직접 커밋).
+   - **커밋 실행**: AGENT.md 5)의 커밋 실행 규칙대로 파일별로 `git add <파일>` + `git commit` 하고,
+     `git log --oneline`과 `git status`를 보여준 뒤 멈춘다.
+   - **메시지 수정**: 반영해서 다시 제안하고 다시 묻는다.
+   - **직접 커밋**: 커밋하지 않고 멈춘다.
