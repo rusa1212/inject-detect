@@ -155,18 +155,18 @@
 > 목표: 모든 탐지기를 같은 기준으로 비교할 수 있는 벤치마크 도구
 
 ### S5-1. 공통 Detector 인터페이스
-- [ ] `Detector.predict(texts) -> scores` 프로토콜 정의 (룰·공개 모델·자체 모델·하이브리드 공통)
+- [x] `Detector.predict(texts) -> scores` 프로토콜 정의 (룰·공개 모델·자체 모델·하이브리드 공통)
 
 ### S5-2. 지표 계산
-- [ ] 언어별 Precision / Recall / F1
-- [ ] 오탐률 (정상 세트, 하드 네거티브 세트 각각)
-- [ ] 우회 공격 세트 탐지율 (기법별)
+- [x] 언어별 Precision / Recall / F1
+- [x] 오탐률 (정상 세트, 하드 네거티브 세트 각각)
+- [x] 우회 공격 세트 탐지율 (기법별)
 
 ### S5-3. 지연시간 측정
-- [ ] CPU 기준 평균 / p95, 워밍업 제외, 입력 길이 구간별 측정
+- [x] CPU 기준 평균 / p95, 워밍업 제외, 입력 길이 구간별 측정
 
 ### S5-4. 리포트 생성
-- [ ] 결과를 `eval/results/*.json`으로 저장, Markdown 결과표 자동 생성
+- [x] 결과를 `eval/results/*.json`으로 저장, Markdown 결과표 자동 생성
 - **완료 기준**: `python -m eval.run --detector rules` 실행 시 결과표 출력
 
 ---
