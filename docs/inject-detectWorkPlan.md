@@ -155,7 +155,7 @@
 > 목표: 모든 탐지기를 같은 기준으로 비교할 수 있는 벤치마크 도구
 
 ### S5-1. 공통 Detector 인터페이스
-- [ ] `Detector.predict(texts) -> scores` 프로토콜 정의 (룰·공개 모델·자체 모델·하이브리드 공통)
+- [x] `Detector.predict(texts) -> scores` 프로토콜 정의 (룰·공개 모델·자체 모델·하이브리드 공통)
 
 ### S5-2. 지표 계산
 - [ ] 언어별 Precision / Recall / F1
