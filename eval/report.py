@@ -7,7 +7,8 @@
       "created_at": "2026-11-18T12:00:00+00:00",
       "dataset": {"n": 508, "langs": {"en": 119, "ko": 389}},
       "metrics": {...},   # EvalMetrics.to_dict()  (S5-2)
-      "latency": {...}    # LatencyReport.to_dict() (S5-3), 측정 생략 시 null
+      "latency": {...},   # LatencyReport.to_dict() (S5-3), 측정 생략 시 null
+      "model": {"id": "...", "revision": "..."}  # 모델 탐지기만 (model_id 속성이 있을 때)
     }
 
 Markdown 은 이 JSON 만으로 다시 만들 수 있다 (``render_markdown(json.load(...))``).
@@ -52,7 +53,7 @@ def run_eval(
     thr = detector.threshold if threshold is None else float(threshold)
     metrics = compute_metrics(samples, scores, thr)
     lat = measure_latency(detector, texts, warmup=warmup, repeats=repeats) if latency else None
-    return {
+    result = {
         "detector": detector.name,
         "split": split,
         "threshold": thr,
@@ -64,6 +65,10 @@ def run_eval(
         "metrics": metrics.to_dict(),
         "latency": lat.to_dict() if lat else None,
     }
+    model_id = getattr(detector, "model_id", None)
+    if model_id:
+        result["model"] = {"id": model_id, "revision": getattr(detector, "revision", None)}
+    return result
 
 
 def save_result(result: dict, out_dir: Path | str = RESULTS_DIR) -> tuple[Path, Path]:
@@ -120,6 +125,11 @@ def render_markdown(result: dict) -> str:
         f"- 임계값: {result['threshold']} (score ≥ 임계값 → 공격)",
         f"- 데이터: {ds['n']}건 ({langs_n})",
         f"- 생성: {result['created_at']}",
+    ]
+    if result.get("model"):
+        md = result["model"]
+        lines.append(f"- 모델: `{md['id']}` (revision `{md.get('revision') or '-'}`)")
+    lines += [
         "",
         "## 언어별 성능 (원문만, 우회 변형 제외)",
         "",
