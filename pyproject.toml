@@ -46,6 +46,8 @@ data = [
 # 모델 학습·변환 (Colab 등 학습 환경용)
 train = [
     "transformers>=4.40",
+    "sentencepiece>=0.2",  # mDeBERTa 토크나이저
+    "protobuf>=4.25",
     "datasets>=2.18",
     "torch>=2.2",
     "accelerate>=0.28",
