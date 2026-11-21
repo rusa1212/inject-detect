@@ -1,0 +1,23 @@
+# mDeBERTa-v3-base (다국어, 278M) — 1순위 후보
+# 실행: python -m training.train --config training/configs/mdeberta-v3-base.yaml
+# 키 설명과 기본값은 training/config.py 의 TrainConfig 참고
+model_name: microsoft/mdeberta-v3-base
+run_name: mdeberta-v3-base
+seed: 42
+
+max_length: 256
+train_evasion: true
+langs: null
+
+epochs: 4
+learning_rate: 2.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+train_batch_size: 16
+eval_batch_size: 64
+grad_accum_steps: 1
+class_weight: null
+fp16: true
+
+threshold: 0.5
+best_metric: ko.f1
