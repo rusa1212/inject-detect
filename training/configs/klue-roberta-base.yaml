@@ -1,0 +1,23 @@
+# KLUE RoBERTa-base (한국어 전용, 111M) — 2순위 후보
+# 한국어 어휘에 특화되어 더 가볍고 빠르지만 영어 성능은 낮을 수 있음 (S7-2 에서 비교)
+# 실행: python -m training.train --config training/configs/klue-roberta-base.yaml
+model_name: klue/roberta-base
+run_name: klue-roberta-base
+seed: 42
+
+max_length: 256
+train_evasion: true
+langs: null
+
+epochs: 4
+learning_rate: 3.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+train_batch_size: 16
+eval_batch_size: 64
+grad_accum_steps: 1
+class_weight: null
+fp16: true
+
+threshold: 0.5
+best_metric: ko.f1
