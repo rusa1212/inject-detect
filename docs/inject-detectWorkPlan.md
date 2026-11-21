@@ -179,9 +179,9 @@
 - [x] 3번 작업의 룰 엔진을 평가 프레임워크로 측정
 
 ### S6-2. 공개 모델 베이스라인
-- [ ] ProtectAI DeBERTa 기반 분류기 어댑터
-- [ ] Meta Prompt Guard 계열 어댑터 (라이선스·접근 조건 확인)
-- [ ] 한/영 test 세트에서 측정
+- [x] ProtectAI DeBERTa 기반 분류기 어댑터
+- [x] Meta Prompt Guard 계열 어댑터 (라이선스·접근 조건 확인)
+- [x] 한/영 test 세트에서 측정
 
 ### S6-3. 결과 분석
 - [ ] 영어 대비 한국어 성능 하락 폭 정리
